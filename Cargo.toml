@@ -1,0 +1,3 @@
+[workspace]
+resolver = "2"
+members = ["crates/iec61850", "crates/iec61850_client", "crates/iec61850_server"]

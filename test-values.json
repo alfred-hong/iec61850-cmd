@@ -1,0 +1,197 @@
+{
+  "Meta": {
+    "Generator": "test.csv"
+  },
+  "LogicalDevices": [],
+  "Leaves": [
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO10.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO12.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO7.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO6.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO5.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO4.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO16.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO9.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO1.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO17.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/Q0GAPC10.SPCSO.Oper.ctlVal",
+      "FC": "CO",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/Q0GAPC11.SPCSO.Oper.ctlVal",
+      "FC": "CO",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO38.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO39.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO41.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO42.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04PROT/OvlPTOC1.Op.general",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04EXT/pdGGIO283.SPCSO57.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04LD0/ComGGIO1.SPCSO1.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04LD0/ComGGIO1.SPCSO2.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    },
+    {
+      "Ref": "HV_3_AH_04CTRL/BIGGIO1.SPCSO11.stVal",
+      "FC": "ST",
+      "Type": "BOOL",
+      "Value": {
+        "Raw": false,
+        "Type": "BOOL"
+      }
+    }
+  ]
+}

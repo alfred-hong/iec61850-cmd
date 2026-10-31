@@ -1,0 +1,274 @@
+//! MMS implementation.
+
+use std::{fmt, path::PathBuf, time::Duration};
+
+use async_trait::async_trait;
+use cotp::COTP_MAX_TPDU_SIZE;
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+use tracing_error::SpanTrace;
+
+use crate::iec61850::report::Report;
+
+pub mod acse;
+pub mod asn1;
+pub mod cotp;
+pub mod presentation;
+pub mod session;
+
+pub mod client;
+
+//TODO: Split this into multiple configs
+/// The client configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+
+pub struct ClientConfig {
+	/// The address of the server.
+	pub address: String,
+	/// The port of the server.
+	pub port: u16,
+	/// The connection configuration.
+	#[serde(default)]
+	pub connection: ConnectionConfig,
+	/// The TLS configuration.
+	#[serde(default)]
+	pub tls: Option<TlsClientConfig>,
+}
+
+/// The connection configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct ConnectionConfig {
+	/// The local transport selector.
+	pub local_t_sel: Vec<u8>,
+	/// The remote transport selector.
+	pub remote_t_sel: Vec<u8>,
+	/// The TPDU size.
+	pub tpdu_size: u32,
+	/// The local session selector.
+	pub local_s_sel: Vec<u8>,
+	/// The remote session selector.
+	pub remote_s_sel: Vec<u8>,
+	/// The local presentation selector.
+	pub local_p_sel: Vec<u8>,
+	/// The remote presentation selector.
+	pub remote_p_sel: Vec<u8>,
+	/// The local AP title.
+	pub local_ap_title: Option<Vec<u32>>,
+	/// The remote AP title.
+	pub remote_ap_title: Option<Vec<u32>>,
+	/// The local AE qualifier.
+	pub local_ae_qualifier: Option<u32>,
+	/// The remote AE qualifier.
+	pub remote_ae_qualifier: Option<u32>,
+	/// The maximum number of outstanding calling services.
+	pub max_serv_outstanding_calling: i16,
+	/// The maximum number of outstanding called services.
+	pub max_serv_outstanding_called: i16,
+	/// The data structure nesting level.
+	pub data_structure_nesting_level: i8,
+	/// The maximum PDU size.
+	pub max_pdu_size: i32,
+	/// Maximum time to wait for a server response to a confirmed request
+	/// before failing with `RequestTimeout`. Set to `None` to wait forever.
+	#[serde(default = "default_request_timeout")]
+	pub request_timeout: Option<Duration>,
+	/// Maximum time to wait for the initial TCP connection to be
+	/// established.
+	#[serde(default = "default_connect_timeout")]
+	pub connect_timeout: Duration,
+	/// Maximum time to wait for the rest of a TPKT frame once its header
+	/// has been received. Bounds a peer that stalls mid-frame without
+	/// affecting idle connections waiting for unsolicited reports (the wait
+	/// for the *next* frame is intentionally unbounded). `None` waits
+	/// forever.
+	#[serde(default = "default_frame_read_timeout")]
+	pub frame_read_timeout: Option<Duration>,
+}
+
+/// Default per-request timeout: 30 seconds. Picked to be long enough for the
+/// slowest reasonable IED while still bounding hangs caused by a peer that
+/// silently drops requests.
+const fn default_request_timeout() -> Option<Duration> {
+	Some(Duration::from_secs(30))
+}
+
+/// Default TCP connect timeout: 10 seconds.
+const fn default_connect_timeout() -> Duration {
+	Duration::from_secs(10)
+}
+
+/// Default mid-frame read timeout: 30 seconds.
+const fn default_frame_read_timeout() -> Option<Duration> {
+	Some(Duration::from_secs(30))
+}
+
+/// The client TLS configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TlsClientConfig {
+	/// Path to the client key; if not specified, it will be assumed
+	/// that the server is configured not to verify client
+	/// certificates.
+	#[serde(default)]
+	pub client_key: Option<PathBuf>,
+	/// Path to the client certificate; if not specified, it will be
+	/// assumed that the server is configured not to verify client
+	/// certificates.
+	#[serde(default)]
+	pub client_certificate: Option<PathBuf>,
+	/// Path to the server certificate; if not specified, the host's
+	/// CA will be used to verify the server.
+	#[serde(default)]
+	pub server_certificate: Option<PathBuf>,
+	/// Whether to verify the server's certificates.
+	///
+	/// This should normally only be used in test environments, as
+	/// disabling certificate validation defies the purpose of using
+	/// TLS in the first place.
+	#[serde(default)]
+	pub danger_disable_tls_verify: bool,
+}
+
+impl Default for ClientConfig {
+	fn default() -> Self {
+		Self {
+			address: "localhost".to_owned(),
+			port: 102,
+			connection: ConnectionConfig::default(),
+			tls: None,
+		}
+	}
+}
+
+impl Default for ConnectionConfig {
+	fn default() -> Self {
+		Self {
+			tpdu_size: COTP_MAX_TPDU_SIZE,
+			local_t_sel: vec![0x00, 0x01],
+			remote_t_sel: vec![0x00, 0x01],
+			local_s_sel: vec![0x00, 0x01],
+			remote_s_sel: vec![0x00, 0x01],
+			local_p_sel: vec![0x00, 0x00, 0x00, 0x01],
+			remote_p_sel: vec![0x00, 0x00, 0x00, 0x01],
+			local_ap_title: Some(vec![1, 1, 1, 999]),
+			remote_ap_title: Some(vec![1, 1, 1, 999, 1]),
+			local_ae_qualifier: Some(12),
+			remote_ae_qualifier: Some(12),
+			max_serv_outstanding_calling: 10,
+			max_serv_outstanding_called: 10,
+			data_structure_nesting_level: 10,
+			max_pdu_size: 8192,
+			request_timeout: default_request_timeout(),
+			connect_timeout: default_connect_timeout(),
+			frame_read_timeout: default_frame_read_timeout(),
+		}
+	}
+}
+
+/// A wrapper for the span trace
+#[derive(Debug, Clone)]
+pub struct SpanTraceWrapper(SpanTrace);
+
+impl snafu::GenerateImplicitData for Box<SpanTraceWrapper> {
+	fn generate() -> Self {
+		Box::new(SpanTraceWrapper(SpanTrace::capture()))
+	}
+}
+
+impl fmt::Display for SpanTraceWrapper {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		if self.0.status() == tracing_error::SpanTraceStatus::CAPTURED {
+			write!(f, "\nAt:\n")?;
+			self.0.fmt(f)?;
+		}
+		Ok(())
+	}
+}
+
+#[allow(missing_docs)]
+/// MMS errors
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub), context(suffix(false)))]
+pub enum Error {
+	#[snafu(whatever, display("{message}{context}\n{source:?}"))]
+	Whatever {
+		message: String,
+		#[snafu(source(from(Box<dyn std::error::Error + Send + Sync>, Some)))]
+		source: Option<Box<dyn std::error::Error + Send + Sync>>,
+		#[snafu(implicit)]
+		context: Box<SpanTraceWrapper>,
+	},
+}
+
+/// A trait for a read half connection.
+#[async_trait]
+trait ReadHalfConnection {
+	/// The error type for the read half connection.
+	type Error: std::error::Error + Send + Sync;
+	async fn receive_data(&mut self) -> Result<Vec<u8>, Self::Error>;
+}
+
+/// A trait for a write half connection.
+#[async_trait]
+trait WriteHalfConnection {
+	/// The error type for the write half connection.
+	type Error: std::error::Error + Send + Sync;
+	async fn send_data(&mut self, data: Vec<u8>) -> Result<(), Self::Error>;
+}
+
+#[allow(missing_docs)]
+// This is defined on the mms.ans file but the compiler is not generating the
+// enum automatically. So we define it manually here.
+/// The MMS object class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum MmsObjectClass {
+	NamedVariable = 0,
+	ScatteredAccess = 1,
+	NamedVariableList = 2,
+	NamedType = 3,
+	Semaphore = 4,
+	EventCondition = 5,
+	EventAction = 6,
+	EventEnrollment = 7,
+	Journal = 8,
+	Domain = 9,
+	ProgramInvocation = 10,
+	OperatorStation = 11,
+	DataExchange = 12,
+	AccessControlList = 13,
+}
+
+impl TryFrom<u8> for MmsObjectClass {
+	type Error = Error;
+	fn try_from(value: u8) -> Result<Self, Self::Error> {
+		match value {
+			0 => Ok(MmsObjectClass::NamedVariable),
+			1 => Ok(MmsObjectClass::ScatteredAccess),
+			2 => Ok(MmsObjectClass::NamedVariableList),
+			3 => Ok(MmsObjectClass::NamedType),
+			4 => Ok(MmsObjectClass::Semaphore),
+			5 => Ok(MmsObjectClass::EventCondition),
+			6 => Ok(MmsObjectClass::EventAction),
+			7 => Ok(MmsObjectClass::EventEnrollment),
+			8 => Ok(MmsObjectClass::Journal),
+			9 => Ok(MmsObjectClass::Domain),
+			10 => Ok(MmsObjectClass::ProgramInvocation),
+			11 => Ok(MmsObjectClass::OperatorStation),
+			12 => Ok(MmsObjectClass::DataExchange),
+			13 => Ok(MmsObjectClass::AccessControlList),
+			_ => Err(Error::Whatever {
+				message: "Invalid object class".to_owned(),
+				source: None,
+				context: Box::new(SpanTraceWrapper(SpanTrace::capture())),
+			}),
+		}
+	}
+}
+
+/// A trait for reacting to a new report.
+#[async_trait]
+#[allow(missing_docs)]
+pub trait ReportCallback {
+	async fn on_report(&self, report: Report);
+}

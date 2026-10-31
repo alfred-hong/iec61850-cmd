@@ -1,0 +1,19 @@
+[package]
+name = "iec61850-cmd-client"
+version = "0.0.1"
+edition = "2024"
+license = "MIT"
+description = "iec61850_client command line. Package name avoids the taken crates.io name iec61850-client."
+repository = "https://github.com/alfred-hong/iec61850-cmd"
+homepage = "https://github.com/alfred-hong/iec61850-cmd"
+readme = "README.md"
+
+[[bin]]
+name = "iec61850_client"
+path = "src/main.rs"
+
+[dependencies]
+async-trait = "0.1"
+clap = { version = "4.5", features = ["derive", "env"] }
+iec61850-cmd = { version = "0.0.1", path = "../iec61850" }
+tokio = { version = "1.47", features = ["rt-multi-thread", "macros"] }

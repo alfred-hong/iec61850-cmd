@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SCL xmlns="http://www.iec.ch/61850/2003/SCL" version="2007" revision="B">
+  <Header id="test-csv" version="1" revision="0" nameStructure="IEDName"/>
+  <Communication>
+    <SubNetwork name="StationBus" type="8-MMS">
+      <ConnectedAP iedName="HV_3_AH_04" apName="AP1">
+        <Address>
+          <P type="IP">127.0.0.1</P>
+        </Address>
+      </ConnectedAP>
+    </SubNetwork>
+  </Communication>
+  <IED name="HV_3_AH_04" manufacturer="test" type="csv" revision="1.0">
+    <Services>
+      <DynAssociation/>
+      <GetDirectory/>
+      <GetDataObjectDefinition/>
+      <GetDataSetValue/>
+      <DataSetDirectory/>
+      <ReadWrite/>
+      <GetCBValues/>
+    </Services>
+    <AccessPoint name="AP1">
+      <Server>
+        <LDevice inst="HV_3_AH_04CTRL">
+          <LN0 lnClass="LLN0" inst="" lnType="LLN0_Type"/>
+          <LN prefix="" lnClass="BIGGIO" inst="1" lnType="BIGGIO1_Type"/>
+          <LN prefix="Q0" lnClass="GAPC" inst="10" lnType="GAPC_SPC_Type">
+            <DOI name="SPCSO">
+              <DAI name="ctlModel"><Val>direct-with-normal-security</Val></DAI>
+            </DOI>
+          </LN>
+          <LN prefix="Q0" lnClass="GAPC" inst="11" lnType="GAPC_SPC_Type">
+            <DOI name="SPCSO">
+              <DAI name="ctlModel"><Val>direct-with-normal-security</Val></DAI>
+            </DOI>
+          </LN>
+        </LDevice>
+        <LDevice inst="HV_3_AH_04PROT">
+          <LN0 lnClass="LLN0" inst="" lnType="LLN0_Type"/>
+          <LN prefix="Ovl" lnClass="PTOC" inst="1" lnType="PTOC_Op_Type"/>
+        </LDevice>
+        <LDevice inst="HV_3_AH_04EXT">
+          <LN0 lnClass="LLN0" inst="" lnType="LLN0_Type"/>
+          <LN prefix="pd" lnClass="GGIO" inst="283" lnType="PDGGIO_Type"/>
+        </LDevice>
+        <LDevice inst="HV_3_AH_04LD0">
+          <LN0 lnClass="LLN0" inst="" lnType="LLN0_Type"/>
+          <LN prefix="Com" lnClass="GGIO" inst="1" lnType="COMGGIO_Type"/>
+        </LDevice>
+      </Server>
+    </AccessPoint>
+  </IED>
+  <DataTypeTemplates>
+    <LNodeType id="LLN0_Type" lnClass="LLN0">
+      <DO name="Mod" type="INC_Type"/>
+      <DO name="Beh" type="INS_Type"/>
+    </LNodeType>
+    <LNodeType id="BIGGIO1_Type" lnClass="BIGGIO">
+      <DO name="SPCSO1" type="SPC_Type"/>
+      <DO name="SPCSO4" type="SPC_Type"/>
+      <DO name="SPCSO5" type="SPC_Type"/>
+      <DO name="SPCSO6" type="SPC_Type"/>
+      <DO name="SPCSO7" type="SPC_Type"/>
+      <DO name="SPCSO9" type="SPC_Type"/>
+      <DO name="SPCSO10" type="SPC_Type"/>
+      <DO name="SPCSO11" type="SPC_Type"/>
+      <DO name="SPCSO12" type="SPC_Type"/>
+      <DO name="SPCSO16" type="SPC_Type"/>
+      <DO name="SPCSO17" type="SPC_Type"/>
+      <DO name="SPCSO38" type="SPC_Type"/>
+      <DO name="SPCSO39" type="SPC_Type"/>
+      <DO name="SPCSO41" type="SPC_Type"/>
+      <DO name="SPCSO42" type="SPC_Type"/>
+    </LNodeType>
+    <LNodeType id="GAPC_SPC_Type" lnClass="GAPC">
+      <DO name="SPCSO" type="SPC_Type"/>
+    </LNodeType>
+    <LNodeType id="PTOC_Op_Type" lnClass="PTOC">
+      <DO name="Op" type="ACT_Type"/>
+    </LNodeType>
+    <LNodeType id="PDGGIO_Type" lnClass="GGIO">
+      <DO name="SPCSO57" type="SPC_Type"/>
+    </LNodeType>
+    <LNodeType id="COMGGIO_Type" lnClass="GGIO">
+      <DO name="SPCSO1" type="SPC_Type"/>
+      <DO name="SPCSO2" type="SPC_Type"/>
+    </LNodeType>
+    <DOType id="INC_Type" cdc="INC">
+      <DA name="stVal" fc="ST" bType="INT32"/>
+      <DA name="q" fc="ST" bType="Quality"/>
+      <DA name="t" fc="ST" bType="Timestamp"/>
+      <DA name="ctlModel" fc="CF" bType="Enum" type="CtlModels"/>
+    </DOType>
+    <DOType id="INS_Type" cdc="INS">
+      <DA name="stVal" fc="ST" bType="INT32"/>
+      <DA name="q" fc="ST" bType="Quality"/>
+      <DA name="t" fc="ST" bType="Timestamp"/>
+    </DOType>
+    <DOType id="SPC_Type" cdc="SPC">
+      <DA name="stVal" fc="ST" bType="BOOLEAN"/>
+      <DA name="q" fc="ST" bType="Quality"/>
+      <DA name="t" fc="ST" bType="Timestamp"/>
+      <DA name="ctlModel" fc="CF" bType="Enum" type="CtlModels"/>
+      <DA name="Oper" fc="CO" bType="Struct" type="OperSPC_Type"/>
+    </DOType>
+    <DOType id="ACT_Type" cdc="ACT">
+      <DA name="general" fc="ST" bType="BOOLEAN"/>
+      <DA name="q" fc="ST" bType="Quality"/>
+      <DA name="t" fc="ST" bType="Timestamp"/>
+    </DOType>
+    <DAType id="OperSPC_Type">
+      <BDA name="ctlVal" bType="BOOLEAN"/>
+      <BDA name="origin" bType="Struct" type="Originator_Type"/>
+      <BDA name="ctlNum" bType="INT8U"/>
+      <BDA name="T" bType="Timestamp"/>
+      <BDA name="Test" bType="BOOLEAN"/>
+      <BDA name="Check" bType="Check"/>
+    </DAType>
+    <DAType id="Originator_Type">
+      <BDA name="orCat" bType="Enum" type="OrCat"/>
+      <BDA name="orIdent" bType="Octet64"/>
+    </DAType>
+    <EnumType id="CtlModels">
+      <EnumVal ord="0">status-only</EnumVal>
+      <EnumVal ord="1">direct-with-normal-security</EnumVal>
+    </EnumType>
+    <EnumType id="OrCat">
+      <EnumVal ord="0">not-supported</EnumVal>
+    </EnumType>
+  </DataTypeTemplates>
+</SCL>

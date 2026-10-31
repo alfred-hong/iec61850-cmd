@@ -16,10 +16,10 @@
 
 ### Step 1: 工作区与客户端空壳
 
-- [ ] 建立 Cargo workspace，迁入并演进 `iec61850_1` 为 `crates/iec61850`
-- [ ] 增加 `crates/iec61850_client`，`iec61850_client version` 能跑
-- [ ] `crates/iec61850_server` 先只留空壳，本步不实现服务端
-- [ ] 补上 `README.md` 和 `README-zh.md`，两边章节、命令、默认值和错误原文一致
+- [x] 建立 Cargo workspace，迁入并演进 `iec61850_1` 为 `crates/iec61850`。包名是 `iec61850-cmd`（`iec61850` 在 crates.io 已被占用）。引用、布尔、FLOAT32、品质、UtcTime、EntryID 长度和 GOOSE APDU 头已有往返测试
+- [x] 增加 `crates/iec61850_client`，`iec61850_client version` 能跑。护栏（`--yes`、`--live`、`FC=CO`、`--format`、`--entry-id`、缺主机）已接上。`list lds` 会建连并打印逻辑设备名，连不上是退出码 3，超时是 4。其余已解析的子命令在检查通过后打印 `尚未实现`，退出码 1
+- [x] `crates/iec61850_server` 先只留空壳，本步不实现服务端。包名是 `iec61850-cmd-server`，二进制是 `iec61850_server`。`version` 能跑；`start --scl` 解析旗标后打印 `尚未实现`，退出码 1；没带 `--scl` 是退出码 2
+- [x] 补上 `README.md` 和 `README-zh.md`，两边章节、命令、默认值和错误原文一致
 
 ### Step 2: 客户端先用到的公共块
 
@@ -32,6 +32,8 @@
 
 ### Step 3: 客户端 MMS 命令
 
+命令行已接到现有库。对 `iec61850ctl` 用 `e2e/testdata/interop.icd` 起的 MMS 服务（127.0.0.1 高端口）跑过：`list lds/lns/dos/das/dss/reports`、`find path`、`get object`、`get ln`、`get ds` 的名字和值与该客户端一致。`set object --verify` 写 `GGIO1.SetInt1.setVal` 后，对端读回同一整数，并已写回 0。会话需求按 ISO 8327 大端编码（双工是 `00 02`）。第 1 版 BRCB 是 13 个成员、没有 `ResvTms`。这台装置没有记录本，`GetNameList` object class Journal 被 Confirmed-Error 拒绝，退出码 6，与 `iec61850ctl` 相同。还没有对 libiec61850 的 `iec61850_server` 二进制跑通。`get ds` 的 Read 已是 `specificationWithResult=true`（8-1 Table 45）；带访问说明的响应按 EXPLICIT [0] 解开，成员顺序仍来自数据集目录。`stVal` 成员的品质和时间是另读的 `q` 和 `t`。`control operate --yes` 在 ctlModel 为 `direct-with-normal-security` 时写 `Oper`；`test.icd` 里合闸 `Q0GAPC10.SPCSO` 和分闸 `Q0GAPC11.SPCSO` 各写各的 `stVal`。`status-only` 退出码 6。Select、SelectWithValue、CommandTermination、`control inspect`、`subscribe report`、`get journal` 的条目读取、GOOSE/SV 仍打印 `尚未实现`：库里没有订阅循环、选择状态机、ReadJournal、SCL 读取和原始套接字。
+
 - [ ] `list` / `tree`：目录与 libiec61850 一致。`tree` 不带 `--ld` 时列出整台装置。列下一层要带上上一层：`list lns` 要 `--ld`；`list dos`、`list dss`、`list reports` 要 `--ld` 和 `--ln`；`list das` 还要 `--do`。LD/LN/数据集/报告/记录本目录走 MMS `GetNameList`（见 Notes）；`list das` / GetDataDirectory（及同映射的 GetDataDefinition）走 `GetVariableAccessAttributes`，不是 GetNameList。`GetNameList` 在 `moreFollows=true` 时用上一次最后一个标识作 `continueAfter` 再要，直到 `false`
 - [ ] `find path --ln <节点名> --path <数据名>`：先把各逻辑设备的目录问下来，再在本地过滤。`--ln` 写一部分也能对上，`--path` 要写全。这不是官方的一条服务。第一版不做 `find bulk`
 - [ ] `get object`：单点和 `--csv` 都输出带标头的 CSV，实时列在最后
@@ -41,7 +43,7 @@
 - [ ] `set object`：要带 `--object`、`--fc`、`--value`、`--type`。`--type` 用输入短名 `bool|int|uint|float|enum|string`，大小写不敏感；`boolean` 当成 `bool`，`integer` 当成 `int`，`unsigned` 当成 `uint`，`double` 当成 `float`。其它词退出码 2。拒绝 `FC=CO`，stderr 有 `action=write`。`--verify` 默认关；写了才在写完后读回同一点，对不上则退出码 7
 - [ ] `subscribe report`：要带 `--ld`、`--ln` 和 `--report`。`--type` 默认 `RP`，不写就是这个值。`--report` 写装置列出来的名字。不改写 `DatSet`、`OptFlds`、`TrgOps`、`BufTm`、`IntgPd`、`RptID`，沿用装置已有配置。URCB：先写 `Resv=true`，再写 `RptEna=true`；若 `Resv` 已被其它客户端占用，装置拒绝，退出码 6。BRCB：若写了 `--purge-buf` / `--entry-id` / `--resv-tms`，必须在使能前写；`--entry-id` 是 ACSI EntryID，固定 8 个八位组（恰好 16 个十六进制字符，8-1 §8.1.3.5），否则退出码 2；全 0（`0000000000000000`）是保留值。`--resv-tms` 写 ACSI `ResvTms`（INT16，单位秒）：只允许写 ≥ 0 的值；写负值退出码 2（装置侧可读到 `-1` 表示配置独占，客户端不得写入负值，tissue 300）。使能后只允许再写 `RptEna` 和 `GI`。写在 `RP` 上是用法错误，退出码 2。使能后先读 `TrgOps`，`gi` 为真才写 `GI=true`；为假时不写 GI，stderr 说明，订阅继续。退出时先写 `RptEna=false`；URCB 再写 `Resv=false`。收到的报告是 MMS InformationReport。URCB 的 `SqNum` 按无符号 8 位解，BRCB 按无符号 16 位解；BRCB 使能不把 `SqNum` 置 0（tissue 301）
 - [ ] `control inspect`：要带 `--object`。只查看 ctlModel 和控制对象，不需要 `--yes`
-- [ ] `control operate`：要带 `--object`、`--value`、`--type`。`--type` 与 `set object` 同一套输入短名。没有 `--yes` 时不下发，退出码 2，并打印 Notes 里的那句提示。`--mode` 与 ctlModel 的对应见 Notes。`--confirm-ref` 默认不写，写了才读该点，形式是 `LD/LN.DO.DA[FC]`，对不上则退出码 7。选择、执行或 CommandTermination 失败是退出码 6
+- [ ] `control operate`：要带 `--object`、`--value`、`--type`。`--type` 与 `set object` 同一套输入短名。没有 `--yes` 时不下发：stderr 先打 Notes 里的那句提示，再读当前状态。对象是 `LD/LN.DO` 时读 `LD/LN.DO.stVal`，`FC=ST`，stdout 与 `get object` 同一份 CSV，退出码跟这次读取走。缺主机、引用不合法或写了 `--format` 仍是退出码 2，提示照样打出。`--mode` 与 ctlModel 的对应见 Notes。`--confirm-ref` 默认不写，写了才读该点，形式是 `LD/LN.DO.DA[FC]`，对不上则退出码 7。选择、执行或 CommandTermination 失败是退出码 6
 - [ ] Select 或 SelectWithValue 成功、随后 Operate 失败时，在同一次连接里发 Cancel，stderr 写 `action=cancel`。直接执行失败，或选择被拒绝时，不发。不另加 `control cancel`
 - [ ] `list journals` 用 GetLogicalNodeDirectory 列出 LOG。不带 `--ld` 时先列出全部逻辑设备，再逐个列出记录本名字。每一行都带上逻辑设备名和记录本名称。带了 `--ld` 只列这一台。`get journal --ld <逻辑设备> <记录本名称>` 才读条目，stdout 固定 CSV，列是 `entry_id,time,tag,value`。不写 `--entry` 时走 QueryLogByTime：`--from` 默认当天 00:00，`--to` 不写则读到最新。写了 `--entry` 时走 QueryLogAfter：EntryID 取自 `--entry`，TimeOfEntry 取自 `--from`；此时 `--from` 不写则发全 0 的 Binary Time，不再套用当天 00:00。其它命令不碰装置记录，也不打开 LogEna
 - [ ] 对 libiec61850 模拟装置跑通上述命令。本步不打自己的服务端
@@ -52,8 +54,8 @@
 - [ ] `goose list` 和 `sv list` 只读 `--scl`，不连网、不抓包。每一行带上 IED 名、控制块、APPID、目的地址、VLAN 和数据集。`--ied-name` 不写就列出全部 IED，写了只列这一台。不认识的节点记到 stderr 并跳过。不单做 `scl parse`
 - [ ] `goose sniff` 和 `sv sniff` 只强制网卡名，不读工程文件，也不要 `--host`。`--count` 默认 0，表示不限条数。`--duration` 默认 0，表示直到 Ctrl+C。只写了 `--count` 时，凑满就退出码 0。只写了 `--duration` 时，到时就退出码 0。两个都写了且时限内没凑满，退出码 4
 - [ ] `goose subscribe` 要 `--iface`、`--scl`、`--gocb`。`sv subscribe` 要 `--iface`、`--scl`、`--svcb`。按工程文件里的地址、APPID，以及 gocbRef 或 svID 过滤。帧里缺 `goID` 时按 tissue 1739 / 8-1 §18.1.1 当作默认 GoID（= 该帧 `gocbRef`，即 GoCB 未配置 GoID 时的缺省）再与 SCL 的 `appID` 比。datSet、goID 或 svID、confRev 对不上，或 `ndsCom` 为真的帧，记到 stderr，不计入 `--count`，命令继续。以太网头或 PDU 里仿真位为真时，没有 `--accept-simulation` 就丢掉，不计入 `--count`。停止规则与抓包相同
-- [ ] 发布要网卡名、`--scl`、控制块名和 `--yes`，不要 `--host`。先选定 IED，再在它的 `ConnectedAP` 下用逻辑设备的 `inst` 和控制块名对上 `GSE` 或 `SMV`。目的地址、十六进制 APPID、VLAN、MinTime、MaxTime 取自那里，不取自 `GSEControl` 的 `appID`。GOOSE 的以太网类型是 `0x88B8`，采样值是 `0x88BA`。采样率和重传规则见 Notes。源 MAC 用这块网卡自己的地址。没写的成员用该类型的零值，SV 品质为 good。`--value` 选填，可重复，写成 `序号=值` 或 `LD/LN.DO.DA[FC]=值`。不做正弦或其它物理量仿真。`--duration` 默认 0，直到 Ctrl+C，到时退出码 0
-- [ ] GOOSE 的 `--test` 默认真。SV 的 `--simulation` 默认真。写成 `false` 时必须再带 `--live`，否则退出码 2，帧不发出，并打印 Notes 里的那句提示。只写 `--live` 不会把位关掉。没有 `--yes` 时同样退出码 2，帧不发出
+- [ ] 发布要网卡名、`--scl`、控制块名，不要 `--host`，也不要 `--yes`。先选定 IED，再在它的 `ConnectedAP` 下用逻辑设备的 `inst` 和控制块名对上 `GSE` 或 `SMV`。目的地址、十六进制 APPID、VLAN、MinTime、MaxTime 取自那里，不取自 `GSEControl` 的 `appID`。GOOSE 的以太网类型是 `0x88B8`，采样值是 `0x88BA`。采样率和重传规则见 Notes。源 MAC 用这块网卡自己的地址。没写的成员用该类型的零值，SV 品质为 good。`--value` 选填，可重复，写成 `序号=值` 或 `LD/LN.DO.DA[FC]=值`。不做正弦或其它物理量仿真。`--duration` 默认 0，直到 Ctrl+C，到时退出码 0
+- [ ] GOOSE 的 `--test` 默认真。SV 的 `--simulation` 默认真。写成 `false` 时必须再带 `--live`，否则退出码 2，帧不发出，并打印 Notes 里的那句提示。只写 `--live` 不会把位关掉。发布不看 `--yes`
 - [ ] 同一台机器的两块网卡或一对虚拟网卡上，一边发一边收。默认 GOOSE `--test=true` 时 PDU/Reserved1 仿真位为真，接收侧要加 `--accept-simulation` 才收下；品质属性里的 test 位不挡订阅。SV 同理看帧上的仿真位
 - [ ] `goose gocb get|set` 和 `sv svcb get|set` 走 MMS，要 `--host`、`--ld` 和控制块名，不读工程文件。set 只写 `--enable` / `--disable`、`--go-id` 或 `--msv-id`、`--dat-set`。`GoEna` / `SvEna` 随时可写。`GoID` / `MsvID` 和 `DatSet`：按 7-2 SetGoCBValues / SetMSVCBValues，仅在未使能时可写，使能最后写（使能为真时装置须拒绝）。8-1 Table 73 把 GoCB 的 GoID/DatSet 列成 `r`，与 7-2 / tissue 1582 的可写语义不一致；本项目按 7-2 可写实现（与 libiec61850 互通），装置若只读拒绝则退出码 6。不写 `ConfRev`、`NdsCom`、`DstAddress`、`MinTime`、`MaxTime`、`FixedOffs`（只读）。装置侧对 `DatSet` 的成功写入（含写成相同值）仍会使 `ConfRev` 加 1（7-2 / tissue 1582）。GoCB 上 `GoID` 未配置时的缺省是该控制块对象引用（8-1 §18.1.1）；get 若读到空则按此理解。写了 `--enable` 或 `--disable` 后读回不一致，退出码 7。装置拒绝为 6
 - [ ] 控制块不在工程文件里，退出码 5。文件打不开，或发布、订阅用的控制块没有可用地址，退出码 2，帧不发出
@@ -87,7 +89,7 @@ crates/iec61850/src/
 | 解析深度 | Step 4 从控制块读数据集和成员，从对上的 `GSE` / `SMV` 读地址和 APPID。不单做 `scl parse` |
 | 报告 | 客户端 URCB 和 BRCB 一起做 |
 | 控制 | 见下方 ctlModel 对照表。SBOw 是对象，不是模型名 |
-| 确认标识 | `operate` 和 GOOSE/SV 发布都必须带 `--yes`。`--test` 和 `--simulation` 默认真。写成 `false` 时必须再带 `--live`；只写 `--live` 不会把位关掉 |
+| 确认标识 | 只有 `control operate` 带 `--yes` 才下发。没带则 stderr 打提示，并改为读取该对象的当前状态（`LD/LN.DO` 读 `LD/LN.DO.stVal`，`FC=ST`），退出码跟这次读取走。列出、读取、写值、报告和 GOOSE/SV 不接受 `--yes`。列出和读取只取参数。`--test` 和 `--simulation` 默认真。写成 `false` 时必须再带 `--live`；只写 `--live` 不会把位关掉 |
 | 取消 | 不另加 `control cancel`。Select 或 SelectWithValue 成功、Operate 失败时，由 `operate` 在同一次连接里发出。直接执行失败，或选择被拒绝时，不发 |
 | 装置记录 | 不设 `--journal`。浏览、读、写、报告、控制不去问。`list journals` 只列名字。`get journal` 的 CSV 列是 `entry_id,time,tag,value`。都不打开装置上的日志开关 |
 | 程序日志 | 默认开启，只走 stderr。不做成 `--log-level` |
@@ -143,7 +145,7 @@ iec61850_client
 
 参数分两类。
 
-**必填：** 不写就不知道对哪一个对象操作，或者是已经定过的护栏。要连装置的命令，主机用 `--host` 或环境变量 `IEC61850_HOST`，两边都空则不能连。`goose` / `sv` 的 list、sniff、subscribe、publish 不在此列。另外还有 `find path` 的 `--ln` 和 `--path`、`get object` 的 `--object` 和 `--fc`、`get ln` 的 `--ln`、`get ds` 的 `--dataset`、`set object` 的 `--object`、`--fc`、`--value` 和 `--type`、`subscribe report` 的 `--ld`、`--ln`、`--report`、`control inspect` 的 `--object`、`control operate` 的 `--object`、`--value`、`--type` 和 `--yes`、`get journal` 的 `--ld` 和记录本名称。`goose list` 和 `sv list` 要 `--scl`。抓包要 `--iface`。`goose subscribe` 要 `--iface`、`--scl`、`--gocb`；`sv subscribe` 要 `--iface`、`--scl`、`--svcb`。`goose publish` 要 `--iface`、`--scl`、`--gocb` 和 `--yes`；`sv publish` 要 `--iface`、`--scl`、`--svcb` 和 `--yes`。控制块的 get/set 要 `--ld` 和控制块名，并且要能连上装置。标准没有「省略就用某一台装置、某一块控制块」这种默认值，所以这些不能空着。
+**必填：** 不写就不知道对哪一个对象操作，或者是已经定过的护栏。要连装置的命令，主机用 `--host` 或环境变量 `IEC61850_HOST`，两边都空则不能连。`goose` / `sv` 的 list、sniff、subscribe、publish 不在此列。另外还有 `find path` 的 `--ln` 和 `--path`、`get object` 的 `--object` 和 `--fc`、`get ln` 的 `--ln`、`get ds` 的 `--dataset`、`set object` 的 `--object`、`--fc`、`--value` 和 `--type`、`subscribe report` 的 `--ld`、`--ln`、`--report`、`control inspect` 的 `--object`、`control operate` 的 `--object`、`--value`、`--type` 和 `--yes`、`get journal` 的 `--ld` 和记录本名称。`goose list` 和 `sv list` 要 `--scl`。抓包要 `--iface`。`goose subscribe` 要 `--iface`、`--scl`、`--gocb`；`sv subscribe` 要 `--iface`、`--scl`、`--svcb`。`goose publish` 要 `--iface`、`--scl`、`--gocb`；`sv publish` 要 `--iface`、`--scl`、`--svcb`。两者都不要 `--yes`。控制块的 get/set 要 `--ld` 和控制块名，并且要能连上装置。标准没有「省略就用某一台装置、某一块控制块」这种默认值，所以这些不能空着。
 
 **选填：** 不写就用默认值，不能把它们做成必填。要连装置的命令可以再带 `--scl`。带了，就从选定 IED 的 `ConnectedAP/Address` 读取 `OSI-TSEL`、`OSI-SSEL`、`OSI-PSEL` 和 `MMS-Port`，按十六进制字节原样使用，不改长度。`--port` 写了才盖过 `MMS-Port`。文件里没有这些项时，才用端口 `102`、TSEL/SSEL=`0001`、PSEL=`00000001`。不带 `--scl` 时直接用这组值。标准没有默认值、本计划已经定过的，用计划里的值：报告 `--type` 为 `RP`，`get journal` 的 `--from` 为当天 00:00，`--to` 不写则读到最新，`--mode` 为 `auto`，控制的 Test 位为假、Check 不附加检查、时间用当前时间。抓包和订阅的 `--count` 为 0、`--duration` 为 0。发布的 `--duration` 为 0。`--test` 和 `--simulation` 为真。`--entry`、`--ld`（仅 `list journals`）、`--format`、`--dry-run`、`--ied-name`、`--verify`、`--confirm-ref`、发布用的 `--value`、`--live`、`--accept-simulation`、`--enable`、`--disable`、`--go-id`、`--msv-id`、`--dat-set`、`--purge-buf`、`--entry-id`、`--resv-tms` 都是选填；不写表示不用这项，或用上面的默认。
 
@@ -178,17 +180,13 @@ HV_3_AH_04CTRL/BIGGIO1.SPCSO10.stVal,ST,0,BOOLEAN,good:0000,2026-10-29T02:23:01.
 
 多行输入可以带可选列，例如 `name`，输出仍把实时列放在最后。案例点：`BIGGIO1` 的 SPCSO10、12、7、6、5、4、16、9、1、17、38、39、41、42、11 的 `stVal`，以及 `OvlPTOC1.Op.general`、`pdGGIO283.SPCSO57.stVal`、`ComGGIO1.SPCSO1.stVal`、`ComGGIO1.SPCSO2.stVal`，FC 都是 `ST`。`Q0GAPC10.SPCSO.Oper.ctlVal` 和 `Q0GAPC11.SPCSO.Oper.ctlVal` 的 FC 是 `CO`。逻辑设备名分别是 `HV_3_AH_04CTRL`、`HV_3_AH_04PROT`、`HV_3_AH_04EXT`、`HV_3_AH_04LD0`。
 
-`control operate` 没带 `--yes` 时，stderr 写下面这一句，退出码 2：
+`control operate` 没带 `--yes` 时，控制不下发。stderr 先写下面这一句，然后读取当前状态：对象是 `LD/LN.DO` 时读 `LD/LN.DO.stVal`，`FC=ST`，stdout 用读值 CSV。退出码跟这次读取走。缺主机、引用不合法或写了 `--format` 时仍是退出码 2，这句提示照样打出：
 
 ```text
 存在控制，但是该控制未生效，需要添加确认标识 --yes
 ```
 
-带上 `--yes` 之后，按上面的 ctlModel 对照表选择（如果需要）并执行。stderr 的 `action=operate` 带上对象和值。`--dry-run` 默认关。`--confirm-ref` 不写则不做额外的状态读回。GOOSE/SV 发布没带 `--yes` 时同样退出码 2，stderr 写：
-
-```text
-发布未生效，需要添加确认标识 --yes
-```
+带上 `--yes` 之后，按上面的 ctlModel 对照表选择（如果需要）并执行。stderr 的 `action=operate` 带上对象和值。`--dry-run` 默认关。`--confirm-ref` 不写则不做额外的状态读回。列出、读取、写值、报告和 GOOSE/SV 不接受 `--yes`。发布没带 `--yes` 仍然可以发帧；关掉测试位或仿真位才要 `--live`。
 
 GOOSE 写成 `--test=false`、或 SV 写成 `--simulation=false`，但没带 `--live` 时，退出码 2，帧不发出，stderr 写：
 
@@ -258,7 +256,7 @@ GOOSE 计数按 8-1 发布状态机（Figure 10），不用 0 去填 `stNum`。`
 | S38–S39 | Get/SetGoCBValues | 有 | 有 | 无 | Step 4 |
 | S45 | SendMSVMessage | 服务端有 | 有 | 无 | Step 4，仅 Linux 网卡。这里是客户端发布 |
 | S46–S47 | Get/SetMSVCBValues | 有 | 有 | 无 | Step 4 |
-| S51–S55 | Select、SelectWithValue、Cancel、Operate、CommandTermination | 有 | 有或一部分 | 无 | Step 3。按 ctlModel 对照表。Operate 必须先有 `--yes`。失败为退出码 6。Cancel 在 Select 或 SelectWithValue 成功且 Operate 失败时发出。`--confirm-ref` 对不上才是 7 |
+| S51–S55 | Select、SelectWithValue、Cancel、Operate、CommandTermination | 有 | 有或一部分 | 无 | Step 3。按 ctlModel 对照表。Operate 必须先有 `--yes` 才下发；没带则提示后只读 `stVal`。失败为退出码 6。Cancel 在 Select 或 SelectWithValue 成功且 Operate 失败时发出。`--confirm-ref` 对不上才是 7 |
 
 进程退出码不是 IEC 61850 条文里的号码。装置在报文里返回的 ServiceError、Abort 和 MMS 错误，由命令行收成下面这张表。表的含义对齐 `iec61850ctl`，号码就此固定，不再另选。
 
@@ -266,7 +264,7 @@ GOOSE 计数按 8-1 发布状态机（Figure 10），不用 0 去填 `stNum`。`
 |--------|------|
 | 0 | 成功。`--help` 也是 0 |
 | 1 | 失败，但分不到下面任何一类 |
-| 2 | 用法或输入不对：旗标、引用、配置不合法，未知的 `--format`，工程文件打不开，或发布、订阅用的控制块没有可用地址。`GSE` 没有可用的重传时间，或采样模式是每周波点数，也是 2，帧不发出，stderr 用 Notes 里已写死的句子。控制或发布没带 `--yes`，以及 `--test=false` / `--simulation=false` 时没带 `--live`，同样是 2 |
+| 2 | 用法或输入不对：旗标、引用、配置不合法，未知的 `--format`，工程文件打不开，或发布、订阅用的控制块没有可用地址。`GSE` 没有可用的重传时间，或采样模式是每周波点数，也是 2，帧不发出，stderr 用 Notes 里已写死的句子。`--test=false` / `--simulation=false` 时没带 `--live`，同样是 2。`control operate` 没带 `--yes` 时，只有状态读启动不了才是 2 |
 | 3 | 连接失败，或连上之后断开。对端 Abort、报告订阅中途拆链，都是 3 |
 | 4 | 连接或请求超时。GOOSE/SV 抓包、订阅写了 `--count` 和 `--duration`，时限内没凑满条数，也是 4。两个旗标默认都是 0，不写则一直到 Ctrl+C |
 | 5 | 找不到：对象、文件、数据集、IED、报告控制块、记录本、GOOSE/SV 控制块或网卡。含装置回答的 object-non-existent，以及逻辑设备不在本次 domain 列表（`type=NOT_ON_DEVICE`） |

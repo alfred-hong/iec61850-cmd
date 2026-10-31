@@ -1,0 +1,5 @@
+[files]
+extend-exclude = ["src/mms/asn1/*", "src/mms/acse.rs"]
+
+[default.extend-words]
+AARE = "AARE"
